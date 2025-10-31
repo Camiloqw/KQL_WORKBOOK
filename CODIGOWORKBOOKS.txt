@@ -1,0 +1,161 @@
+1- Tiempo promedio en segundos de ejecución de la Azure Function
+
+requests
+| where cloud_RoleName == "fun-transformacion2"
+| where name == "leerarchivo6"                           // tu función específica
+| where timestamp between (datetime(2025-08-06 03:59:00) .. datetime(2025-08-07 06:00:00))
+| project timestamp, duration_seg = duration / 1000, success, operation_Id
+| order by timestamp desc
+
+
+ 2-Tiempo de carga en segundos del Blob a SQL Database
+
+traces
+| where message has "Métricas de ejecución de Azure Function"
+| where customDimensions.DuracionCargaSQLMs != ""
+| where timestamp between (datetime(2025-08-06 03:59:00) .. datetime(2025-08-07 06:00:00))
+| extend 
+    DuracionCargaSQLMs = toint(customDimensions.DuracionCargaSQLMs),
+    Archivo = tostring(customDimensions.Archivo),
+    DuracionCargaSQLSeg = round(todouble(customDimensions.DuracionCargaSQLMs) / 1000.0, 2)
+| project timestamp, DuracionCargaSQLSeg
+| order by timestamp desc
+
+3- Consumo de CPU y Memoria de Azure Function
+performanceCounters
+| where name in ("Private Bytes")
+| where isnotempty(value)
+| where timestamp between (datetime(2025-08-06 03:59:00) .. datetime(2025-08-06 16:00:00))
+| summarize Promedio = avg(value) by bin(timestamp, 1m), name
+| order by timestamp desc
+
+performanceCounters
+| where name in ("% Processor Time")
+| where isnotempty(value)
+| where timestamp between (datetime(2025-08-03 22:27:00) .. datetime(2025-08-04 04:00:00))
+| summarize Promedio = avg(value) by bin(timestamp, 1m), name
+| order by timestamp desc
+
+4- Throughput
+AzureDiagnostics
+| where ResourceType == "FACTORIES"
+  and Resource == "DATAFACTORY-TFM"
+  and Category == "ActivityRuns"
+  and activityType_s == "Copy"
+  and TimeGenerated between (datetime(2025-08-06T00:00:00Z) .. datetime(2025-08-06T23:59:59Z))
+  and isnotnull(Output_throughput_d)
+| project 
+    TimeGenerated,
+    Pipeline = pipelineName_s,
+    Activity = activityName_s,
+    Throughput_reportado = Output_throughput_d, // el que da ADF
+    DataRead_bytes = Output_dataRead_d,
+    CopyDuration_s = Output_copyDuration_d,
+    Throughput_MBps_calculado = todouble(Output_dataRead_d) / 1024.0 / 1024.0 / todouble(Output_copyDuration_d)
+
+| order by TimeGenerated desc
+
+
+5- Latencia Blob Storage
+traces
+| where customDimensions.DuracionLecturaBlobMs != ""
+| extend LatenciaMs = todouble(customDimensions.DuracionLecturaBlobMs)
+| extend LatenciaSegundos = LatenciaMs / 1000
+| summarize LatenciaPromedioSegundos = avg(LatenciaSegundos) by bin(timestamp, 1m)
+| render timechart
+
+6- Tiempo de respuesta de Azure SQL a queries
+
+traces
+| where message == "Tiempo de respuesta de query Azure SQL"
+//| where timestamp between (datetime(2025-08-02 20:00:00) .. datetime(2025-08-03 02:00:00))
+| extend archivo = tostring(customDimensions.Archivo)
+| extend registros = toint(customDimensions.RegistrosInsertados)
+| extend sql_ms = toint(customDimensions.DuracionQuerySQLMsQUERY)
+| where isnotempty(archivo) and sql_ms > 0   
+| summarize 
+    total_sql_ms = sum(sql_ms),              
+    total_sql_seg = sum(sql_ms) / 1000.0,    
+    ejecuciones = count()                    
+    by archivo
+| order by total_sql_ms desc
+
+
+7- Duración del pipeline
+
+AzureDiagnostics
+| where ResourceType == "FACTORIES"
+  and Resource == "DATAFACTORY-TFM"
+  and Category == "ActivityRuns"
+  and activityType_s == "Copy"
+  and TimeGenerated >= ago(24h)
+| extend 
+    Duracion_calc_seg = datetime_diff("second", end_t, start_t)
+| project 
+    TimeGenerated,
+    status_s,
+    Pipeline = pipelineName_s,
+    Activity = activityName_s,
+    Duracion_copy_d = Output_copyDuration_d,
+    Duracion_start_end_s = Duracion_calc_seg
+| where isnotempty(Duracion_copy_d)
+| order by TimeGenerated desc
+
+8- Errores Por actividad 
+
+AzureDiagnostics
+| where ResourceType == "FACTORIES"
+  and Resource == "DATAFACTORY-TFM"
+  and Category == "ActivityRuns"
+  and activityType_s == "Copy"
+  and TimeGenerated >= ago(24h)
+| project 
+    TimeGenerated,
+    Pipeline = pipelineName_s,
+    Activity = activityName_s,
+    Estado = status_s,
+    Errores = Output_errors_s
+| where isnotempty(Errores) and Errores != "[]"
+| order by TimeGenerated desc
+
+9-Número de filas leídas, escritas y rechazadas
+
+AzureDiagnostics
+| where ResourceType == "FACTORIES"
+  and Resource == "DATAFACTORY-TFM"
+  and Category == "ActivityRuns"
+  and activityType_s == "Copy"
+  and TimeGenerated >= ago(24h)
+| extend 
+    Filas_Leidas = Output_rowsRead_d,
+    Filas_Copiadas = Output_rowsCopied_d,
+    Filas_Rechazadas = todouble(Output_rowsRead_d) - todouble(Output_rowsCopied_d)
+| where isnotempty(Filas_Leidas) and isnotempty(Filas_Copiadas) and isnotempty(Filas_Rechazadas)
+| project 
+    TimeGenerated,
+    Pipeline = pipelineName_s,
+    Activity = activityName_s,
+    Filas_Leidas,
+    Filas_Copiadas,
+    Filas_Rechazadas
+| order by TimeGenerated desc
+
+
+***********************************************************WORKBOOK Seguridad******************************************************************************
+1-% de recursos desplegados fuera de región permitida
+
+PolicyResources
+
+
+2-Nº de recursos no cifrados
+PolicyResources
+| where PolicyDefinitionName contains "encryption" or PolicyDefinitionCategory == "Security"
+| where ComplianceState == "NonCompliant"
+| summarize NoCifrados = count() by ResourceType
+
+3- Auditoría de eliminación segura de datos (Blob/SQL)
+
+AzureDiagnostics
+| where OperationName in ("DeleteBlob", "Delete", "DeleteTable", "DropTable") 
+| project TimeGenerated, Resource, OperationName, Identity, ActivityId
+| summarize Eliminaciones = count() by bin(TimeGenerated, 1d)
