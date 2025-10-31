@@ -26,6 +26,13 @@ CREATE TABLE CostosTarifas (
     costounitariotarifa_valor_tarifa FLOAT(24) NULL
 );
 
+-- Asignarle roles básicos
+ALTER ROLE db_datareader ADD MEMBER [ccubillost@student.universidadviu.com];
+ALTER ROLE db_datawriter ADD MEMBER [ccubillost@student.universidadviu.com];
+
+CREATE USER [fun-transformacion] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [fun-transformacion];
+ALTER ROLE db_datawriter ADD MEMBER [fun-transformacion];
 
 ********************************************************************************************
 1- Tiempo promedio en segundos de ejecución de la Azure Function
