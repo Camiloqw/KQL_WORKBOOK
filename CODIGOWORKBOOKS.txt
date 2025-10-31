@@ -1,3 +1,33 @@
+--CREATE DE TABLA PRINCIPAL SQL
+CREATE TABLE CostosTarifas (
+    costounitariotarifa_ano INT(MAX) NULL,
+    costounitariotarifa_mes INT(MAX) NULL,
+    comercializador_codigo VARCHAR(MAX) NULL,
+    comercializador_nombre VARCHAR(MAX) NULL,
+    mercado_codigo VARCHAR(MAX) NULL,
+    mercado_nombre VARCHAR(MAX) NULL,
+    costounitariotarifa_tipomed VARCHAR(MAX) NULL,
+    nivel_tension_codigo VARCHAR(MAX) NULL,
+    modalidadcobro_propiedad VARCHAR(MAX) NULL,
+    claseservicio_codigo VARCHAR(MAX) NULL,
+    claseservicio_descri VARCHAR(MAX) NULL,
+    claseservicio_estrato VARCHAR(MAX) NULL,
+    costounitariotarifa_rangoconsumo VARCHAR(MAX) NULL,
+    costounitariotarifa_tipomercado VARCHAR(MAX) NULL,
+    costounitariotarifa_generacion VARCHAR(MAX) NULL,
+    costounitariotarifa_transmision VARCHAR(MAX) NULL,
+    costounitariotarifa_distribucion VARCHAR(MAX) NULL,
+    costounitariotarifa_comercializacion VARCHAR(MAX) NULL,
+    costounitariotarifa_perdidas VARCHAR(MAX) NULL,
+    costounitariotarifa_restricciones VARCHAR(MAX) NULL,
+    costounitariotarifa_cu VARCHAR(MAX) NULL,
+    costounitariotarifa_cureal VARCHAR(MAX) NULL,
+    costounitariotarifa_subcon FLOAT(24) NULL,
+    costounitariotarifa_valor_tarifa FLOAT(24) NULL
+);
+
+
+********************************************************************************************
 1- Tiempo promedio en segundos de ejecución de la Azure Function
 
 requests
